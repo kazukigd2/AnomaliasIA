@@ -1,0 +1,96 @@
+version: "3"
+services:
+  web:
+    # replace username/repo:tag with your name and image details
+    image: kazukigd/practica2:part2
+    deploy:
+      replicas: 5
+      restart_policy:
+        condition: on-failure
+    ports:
+      - "4000:80"
+    environment:
+      - REDIS_HOST=redis
+    volumes:
+      - shared-data:/app  # Volumen compartido entre las replicas
+    networks:
+      - webnet
+
+  # Servicio de ZooKeeper
+  zookeeper:
+    image: zookeeper:latest    # Imagen oficial de ZooKeeper
+    ports:
+      - "2181:2181"  # Puerto estándar de comunicación de ZooKeeper
+    networks:
+      - webnet  # Conectar al mismo red que los otros servicios
+
+    # Servicios para las tres instancias de Practica3.py
+  practica3_instance_1:
+    image: kazukigd/practica3:part1
+    environment:
+      - ZOOKEEPER_HOST=zookeeper  # Conexión con el contenedor de ZooKeeper
+      - INSTANCE_ID=instance_1  # Asignar ID única a esta instancia
+    networks:
+      - webnet
+    depends_on:
+      - zookeeper  # Depende del servicio de ZooKeeper
+
+  practica3_instance_2:
+    image: kazukigd/practica3:part1
+    environment:
+      - ZOOKEEPER_HOST=zookeeper  # Conexión con el contenedor de ZooKeeper
+      - INSTANCE_ID=instance_2  # Asignar ID única a esta instancia
+    networks:
+      - webnet
+    depends_on:
+      - zookeeper  # Depende del servicio de ZooKeeper
+
+  practica3_instance_3:
+    image: kazukigd/practica3:part1
+    environment:
+      - ZOOKEEPER_HOST=zookeeper  # Conexión con el contenedor de ZooKeeper
+      - INSTANCE_ID=instance_3  # Asignar ID única a esta instancia
+    networks:
+      - webnet
+    depends_on:
+      - zookeeper  # Depende del servicio de ZooKeeper
+
+  visualizer:
+    image: dockersamples/visualizer:stable
+    ports:
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+    networks:
+      - webnet
+  redis:
+    image: redislabs/redistimeseries:latest
+    ports:
+      - "6379:6379"   
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+    networks:
+      - webnet
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - 3000:3000
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - redis
+    environment:
+      GF_INSTALL_PLUGINS: redis-datasource
+    networks:
+      - webnet
+volumes:
+  grafana_data:
+  shared-data:  # Definimos el volumen compartido
+
+networks:
+  webnet:
